@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<project name="macgriog-laravel-acl" default="install">
+
+    <!-- Vars -->
+    <property name="rootDir" value="."/>
+    <property name="parentdir" value=".."/>
+    <property name="toolsdir" value="${rootDir}/vendor/bin/"/>
+    <property name="builddir" value="${rootDir}/build"/>
+    <property name="lintdir" value="${builddir}/logs"/>
+    <property name="environment" value="develop"/>
+    <property name="threads" value="8"/>
+
+    <condition property="isUnix">
+        <os family="unix"/>
+    </condition>
+    <!-- ============================================  -->
+    <!-- Target: install. basic installation           -->
+    <!-- ============================================  -->
+    <target name="install"
+            depends="install.dependencies"
+            description=""/>
+
+    <target name="install.dependencies"
+            depends=""
+            description="Run composer">
+        <property name="COMPOSER_EXISTS" value="false"/>
+        <!-- Check if composer.phar exists in toolsdir -->
+        <available file="${toolsdir}/composer.phar" property="COMPOSER_EXISTS" value="true"/>
+        <antcall target="install.getcomposer" />
+
+        <exec executable="php" failonerror="true">
+            <arg value="${toolsdir}composer.phar" />
+            <arg value="install" />
+            <arg value="--no-progress" />
+            <arg value="--optimize-autoloader" />
+            <arg value="--working-dir=${rootDir}" />
+        </exec>
+    </target>
+
+    <target name="install.getcomposer" unless="${COMPOSER_EXISTS}">
+        <echo>Trying to load composer.phar from remote.</echo>
+        <mkdir dir="${rootDir}/bin"/>
+        <exec executable="bash">
+            <arg value="-c"/>
+            <arg value="curl -sS https://getcomposer.org/installer | php" />
+        </exec>
+        <move file="composer.phar" tofile="${toolsdir}composer.phar"/>
+    </target>
+
+    <!-- CLEAN -->
+    <target name="clean"
+            unless="clean.done"
+            description="Cleanup build artifacts">
+        <delete dir="${rootDir}/build/dist" quiet='true' />
+        <delete dir="${rootDir}/build/logs" quiet='true' />
+        <delete dir="${rootDir}/build/pdepend" quiet='true' />
+        <delete dir="${rootDir}/build/phpunit" quiet='true' />
+        <property name="clean.done" value="true"/>
+    </target>
+
+    <!-- PREPARE -->
+    <target name="prepare"
+            unless="prepare.done"
+            depends="clean"
+            description="Prepare for build">
+        <mkdir dir="${rootDir}/build/dist"/>
+        <mkdir dir="${rootDir}/build/logs"/>
+        <mkdir dir="${rootDir}/build/pdepend"/>
+        <property name="prepare.done" value="true"/>
+    </target>
+
+    <!-- ============================================  -->
+    <!-- Target: lint . static code analysis.          -->
+    <!-- ============================================  -->
+    <target name="lint"
+            depends="prepare"
+            description="Run all tools for static-code analysis">
+            <antcall target="lint.tryRunParallelPhpTasks"/>
+    </target>
+
+    <target name="lint.tryRunParallelPhpTasks"
+            description="Run the pdepend, phpmd, phpcpd, phpcs, phpdoc and phploc tasks. Checks for parallel support
+                         in PHP.">
+        <exec command="php -m | grep pcntl" outputProperty="grepPCNTL" />
+        <condition property="pcntlEnabled">
+            <equals arg1="${grepPCNTL}" arg2="pcntl" />
+        </condition>
+        <antcall target="lint.runParallelTasks"/>
+        <antcall target="lint.runSerialTasks"/>
+    </target>
+
+    <target name="lint.phpParallelTasks">
+        <antcall target="phploc"/>
+        <antcall target="phpmd"/>
+        <antcall target="pdepend"/>
+        <antcall target="phpcs"/>
+        <antcall target="phpcpd"/>
+    </target>
+
+    <target name="lint.runParallelTasks" if="pcntlEnabled">
+        <echo message="PCNTL Enabled. Running Taks in parallel with ${threads} threads." />
+        <parallel threadCount="${threads}">
+            <antcall target="lint.phpParallelTasks" />
+        </parallel>
+    </target>
+
+    <target name="lint.runSerialTasks" unless="pcntlEnabled">
+        <echo message="PCNTL is not enabled. Running task serially." />
+        <antcall target="lint.phpParallelTasks" />
+    </target>
+
+    <target name="phploc"
+            description="Measure project size using PHPLOC and print human readable output.">
+        <exec executable="${toolsdir}phploc">
+            <arg value="--count-tests"/>
+            <arg value="--log-csv"/>
+            <arg path="${rootDir}/build/logs/phploc.csv"/>
+            <arg value="--log-xml"/>
+            <arg path="${rootDir}/build/logs/phploc.xml"/>
+            <arg path="${rootDir}/src"/>
+            <arg path="${rootDir}/tests"/>
+        </exec>
+    </target>
+
+    <target name="phpmd"
+            description="Perform project mess detection using PHPMD and log result in XML format.">
+        <exec executable="${toolsdir}phpmd">
+            <arg path="${rootDir}/src" />
+            <arg value="xml" />
+            <arg path="${rootDir}/phpmd.xml" />
+            <arg value="--reportfile" />
+            <arg path="${rootDir}/build/logs/pmd.xml" />
+        </exec>
+    </target>
+
+    <target name="pdepend"
+            description="Calculate software metrics using PHP_Depend and log result in XML format.">
+        <exec executable="${toolsdir}pdepend">
+            <arg value="--jdepend-xml=${rootDir}/build/logs/jdepend.xml" />
+            <arg value="--jdepend-chart=${rootDir}/build/pdepend/dependencies.svg" />
+            <arg value="--overview-pyramid=${rootDir}/build/pdepend/overview-pyramid.svg" />
+            <arg path="${rootDir}/src" />
+        </exec>
+    </target>
+
+    <target name="phpcs"
+            description="Find coding standard violations using PHP_CodeSniffer and log result in XML format.">
+        <exec executable="${toolsdir}phpcs" output="/dev/null">
+            <arg value="--report=checkstyle" />
+            <arg value="--report-file=${rootDir}/build/logs/checkstyle.xml" />
+            <arg value="--standard=PSR2" />
+            <arg value="--extensions=php" />
+            <arg value="--ignore=autoload.php" />
+            <arg path="${rootDir}/src" />
+        </exec>
+    </target>
+
+    <target name="phpcpd"
+            description="Find duplicate code using PHPCPD and log result in XML format.">
+        <exec executable="${toolsdir}phpcpd">
+            <arg value="--log-pmd" />
+            <arg path="${rootDir}/build/logs/pmd-cpd.xml" />
+            <arg path="${rootDir}/src" />
+        </exec>
+    </target>
+
+    <!-- ============================================  -->
+    <!-- Target: intended for console. test it all     -->
+    <!-- ============================================  -->
+
+    <!-- Run Unit Tests with Coverage through PHPUnit -->
+    <target name="unit" description="Execute PHPUnit tests with coverage.">
+        <exec executable="${toolsdir}phpunit">
+            <arg line= "-c ${rootDir}/phpunit.xml"/>
+            <arg line="--testsuite unit"/>
+            <arg line="--coverage-html=${builddir}/phpunit/"/>
+            <arg line="--coverage-clover=${builddir}/logs/phpunit-clover.xml"/>
+            <arg line="--log-junit ${builddir}/logs/phpunit.xml"/>
+        </exec>
+    </target>
+
+    <target name="build"
+            depends="install,lint,unit"
+            description="Build package Macgriog Laravel ACL" />
+</project>
