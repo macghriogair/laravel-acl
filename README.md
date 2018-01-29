@@ -1,3 +1,6 @@
+[![Build Status](https://travis-ci.org/macghriogair/laravel-acl.svg?branch=master)](https://travis-ci.org/macghriogair/laravel-acl)
+
+
 # ACL Package for Laravel
 
 Simple access control based on User - Roles - Permissions, adapted from OctoberCMS https://github.com/octobercms/october
@@ -48,3 +51,8 @@ Permissions are persisted in a JSON column, e.g.
 Run tests via PHPUnit:
 
     vendor/bin/phpunit
+
+
+## References
+
+* OctoberCMS https://github.com/octobercms/october
