@@ -4,7 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-class MacgriogAclAlterRolesTable extends Migration
+class MacgriogAclAlterUsersTable extends Migration
 {
     /**
      * Run the migrations.
@@ -13,10 +13,12 @@ class MacgriogAclAlterRolesTable extends Migration
      */
     public function up()
     {
-        if (Schema::hasTable('roles') && ! Schema::hasColumn('roles', 'permissions')) {
-            Schema::table('roles', function (Blueprint $table) {
+        if (Schema::hasTable('users') && ! Schema::hasColumn('users', 'permissions')) {
+            Schema::table('users', function (Blueprint $table) {
                 $table->text('permissions')->nullable();
             });
+        } else {
+            throw new \RuntimeException('Table "users" must exists in order to use ACL package. Better define your custom migration.');
         }
     }
 
@@ -27,8 +29,8 @@ class MacgriogAclAlterRolesTable extends Migration
      */
     public function down()
     {
-        if (Schema::hasTable('roles') && Schema::hasColumn('roles', 'permissions')) {
-            Schema::table('roles', function (Blueprint $table) {
+        if (Schema::hasTable('users') && Schema::hasColumn('users', 'permissions')) {
+            Schema::table('users', function (Blueprint $table) {
                 $table->dropColumn(['permissions']);
             });
         }
