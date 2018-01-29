@@ -86,13 +86,8 @@ trait PermissionStrategy
         $mergedPermissions = $this->getMergedPermissions();
 
         foreach ($this->asArray($permissions) as $permission) {
-            $matched = false;
-            foreach ($mergedPermissions as $mergedPermission => $value) {
-                if ($permission === $mergedPermission && $mergedPermissions[$permission] === 1) {
-                    $matched = true;
-                    break;
-                }
-            }
+            $matched = $this->matchesPermission($permission, $mergedPermissions);
+
             if ($all === true && $matched === false) {
                 return false;
             } elseif ($all === false && $matched === true) {
@@ -100,10 +95,19 @@ trait PermissionStrategy
             }
         }
 
-        if ($all === false) {
-            return false;
+        return false === $all ? false : true;
+    }
+
+    protected function matchesPermission($permission, $allPermissions)
+    {
+        $match = false;
+        foreach (array_keys($allPermissions) as $currentPermission) {
+            if ($permission === $currentPermission && $allPermissions[$permission] === 1) {
+                $match = true;
+                break;
+            }
         }
-        return true;
+        return $match;
     }
 
     protected function asArray($arrayOrString) : array
