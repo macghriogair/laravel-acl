@@ -13,7 +13,7 @@ class MacgriogAclCreateRolesTable extends Migration
      */
     public function up()
     {
-        if (Scheme::hasTable('roles')) {
+        if (Schema::hasTable('roles')) {
             throw new \RuntimeException('Caution! Table "roles" already exists. Better define a custom migration.');
         }
 
